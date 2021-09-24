@@ -1,2 +1,2 @@
-# -mediathekviewweb_cli
+# mediathekviewweb_cli
 command line client for mediathekviewweb.de
