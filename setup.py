@@ -13,5 +13,5 @@ setup(
         "websocket-client",
         "requests",
     ],
-    scripts=['bin/mediathekviewweb_cli'],
+    scripts=["bin/mediathekviewweb_cli"],
 )

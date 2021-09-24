@@ -1,136 +1,80 @@
 #!/bin/env python
 
-import websocket
-import requests
 import argparse
 import json
 
-
-def gets_session_id(token):
-    r = requests.get(
-        "https://mediathekviewweb.de/socket.io/?EIO=4&transport=polling&=t{}".format(
-            token
-        )
-    )
-
-    # remove non json part from response
-    r_text = r.text
-    sid = json.loads(r_text[r_text.index("{") :])["sid"]
-
-    return sid
-
-
-def probe(ws_connection):
-    ws_connection.send("2probe")
-    while True:
-        resp = ws_connection.recv()
-        if resp == "3probe":
-            break
+import mediathekviewweb
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("--station", dest="stations", action="append", help="")
-    parser.add_argument("--topic", dest="topics", action="append", help="")
-    parser.add_argument("--title", dest="titles", action="append", help="")
     parser.add_argument(
-        "--description", dest="descriptions", action="append", help=""
+        "--station",
+        dest="stations",
+        action="append",
+        default=[],
+        help="limit the videos to a station. Multiple occurences of this "
+        "parameter can be used and will return videos for each station.",
     )
-
-    parser.add_argument("--query", dest="query", help="")
-    parser.add_argument("--min-length", dest="min_length", help="")
-    parser.add_argument("--max-length", dest="max_length", help="")
-    parser.add_argument("--max-hits", dest="max_hits", default=20, help="")
-    parser.add_argument("--offset", dest="offset", default=0, help="")
-
+    parser.add_argument(
+        "--topic",
+        dest="topics",
+        action="append",
+        default=[],
+        help="limit the videos to a topic. Multiple occurences of this "
+        "parameter can be used and will return videos for each topic.",
+    )
+    parser.add_argument(
+        "--title",
+        dest="titles",
+        action="append",
+        default=[],
+        help="limit the videos to a title. Multiple occurences of this "
+        "parameter can be used and will return videos for each title.",
+    )
+    parser.add_argument(
+        "--description",
+        dest="descriptions",
+        action="append",
+        default=[],
+        help="limit the videos to a description. Multiple occurences of this "
+        "parameter can be used and will return videos for each description.",
+    )
+    parser.add_argument(
+        "--query",
+        dest="query",
+        help="limit the output to videos with titles and descriptions that "
+        "match the queries.",
+    )
+    parser.add_argument(
+        "--min-length",
+        dest="min_length",
+        help="the minimal length of the video in seconds",
+    )
+    parser.add_argument(
+        "--max-length",
+        dest="max_length",
+        help="the maximal length of the video in seconds",
+    )
+    parser.add_argument(
+        "--max-hits",
+        dest="max_hits",
+        default=20,
+        help="limit the number of results",
+    )
+    parser.add_argument(
+        "--offset", dest="offset", default=0, help="set the offset for paging"
+    )
     args = parser.parse_args()
 
-    token = "Nm1StTN"
-
-    session_id = gets_session_id(token)
-
-    requests.post(
-        "https://mediathekviewweb.de/socket.io/?EIO=4&transport=polling&=t{}&sid={}".format(
-            token, session_id
-        ),
-        data="40",
+    result = mediathekviewweb.query_mediathekview(
+        max_hits=args.max_hits,
+        offset=args.offset,
+        query=args.query,
+        stations=args.stations,
+        topics=args.topics,
+        titles=args.titles,
+        descriptions=args.descriptions,
     )
 
-    requests.get(
-        "https://mediathekviewweb.de/socket.io/?EIO=4&transport=polling&=t{}&sid={}".format(
-            token, session_id
-        )
-    )
-
-    ws_connection = websocket.create_connection(
-        "wss://mediathekviewweb.de/socket.io/?EIO=4&transport=websocket&sid={}".format(
-            session_id
-        )
-    )
-    probe(ws_connection)
-    probe(ws_connection)
-    ws_connection.send("5")
-
-    queries = []
-    if args.query:
-        queries.append(
-            {
-                "fields": ["topic", "title"],
-                "query": args.query,
-            }
-        )
-
-    for station in args.stations or []:
-        queries.append(
-            {
-                "fields": ["channel"],
-                "query": station.lower(),
-            },
-        )
-    for topic in args.topics or []:
-        queries.append(
-            {
-                "fields": ["topic"],
-                "query": topic.lower(),
-            },
-        )
-
-    for title in args.titles or []:
-        queries.append(
-            {
-                "fields": ["title"],
-                "query": title.lower(),
-            },
-        )
-
-    for description in args.descriptions or []:
-        queries.append(
-            {
-                "fields": ["description"],
-                "query": description.lower(),
-            },
-        )
-
-    query_control = {
-        "queries": queries,
-        "sortBy": "timestamp",
-        "sortOrder": "desc",
-        "size": args.max_hits,
-        "offset": args.offset,
-    }
-    if args.min_length:
-        query_control["duration_min"] = args.min_length
-    if args.max_length:
-        query_control["duration_max"] = args.max_length
-
-    query_struct = [
-        "queryEntries",
-        query_control,
-    ]
-    ws_connection.send("420{}".format(json.dumps(query_struct)))
-    while True:
-        resp = ws_connection.recv()
-        if resp:
-            break
-    resp = json.loads(resp[resp.index("[") :])
-    print(json.dumps(resp[0]["result"]["results"]))
+    print(json.dumps(result[0]["result"]["results"]))
