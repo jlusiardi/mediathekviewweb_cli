@@ -14,4 +14,5 @@ setup(
         "requests",
     ],
     scripts=["bin/mediathekviewweb_cli"],
+    packages=["mediathekviewweb"],
 )
